@@ -30,6 +30,11 @@ class Config:
             'end': '2021-12-31'
         }
     }
+    
+    cols = ['Open', 'High', 'Low', 'Close']
+    
+    # Data prep
+    window = 24
 
     train_batch_size = 16
     valid_batch_size = 32
@@ -37,3 +42,9 @@ class Config:
 
     num_epochs = 100
     iters_to_accumlate = 1
+    
+    centered_zero = False
+    
+    # Model params
+    train_2dcnn = True
+    train_gasf_image = True

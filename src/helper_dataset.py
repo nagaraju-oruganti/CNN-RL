@@ -8,6 +8,7 @@ import pickle
 
 from sklearn.preprocessing import StandardScaler
 import torch
+from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 
 from pyts.image import GramianAngularField
@@ -18,6 +19,7 @@ class PrepareDataset:
         self.cfg = config
         self.data_dir = self.cfg.data_dir
         self.tickers = self.cfg.tickers
+        self.extension = ''.join([i[0].lower() for i in self.cfg.cols])
         print('Preparing data to train the DQN model...')
 
     def fetch_from_yahoo_finance(self, ticker, start, end):
@@ -29,21 +31,21 @@ class PrepareDataset:
         return df.fillna(method='bfill')
     
     
-    def normalize(self, df):
+    def normalize(self, df, cols):
         df.reset_index(inplace = True)
-        ohlc_columns = ['Open', 'High', 'Low', 'Close']
         # Normalize with max value
         df['Date'] = pd.to_datetime(df['Date'])
         df['year'] = df['Date'].dt.year
         df['quarter'] = df['Date'].dt.quarter
         df['original_close'] = df['Close']
         df['norm_close'] = df['Close']
+        df['pct_change'] = df['Close'].pct_change()
 
         dfs = []
         for y in df['year'].unique():
             for q in df['quarter'].unique():
                 mdf = df[(df['year'] == y) & (df['quarter'] == q)]
-                for c in ohlc_columns + ['norm_close']:
+                for c in cols + ['norm_close']:
                     min_val = min(mdf[c])
                     max_val = max(mdf[c])
                     mdf[c] = (mdf[c] - min_val) / (max_val - min_val)
@@ -56,23 +58,26 @@ class PrepareDataset:
         return normalized_df
 
     def make_dataset(self, df, ticker, kind):
-        ohlc_columns = ['Open', 'High', 'Low', 'Close']
-        df = self.normalize(df)             # normalize by max value
-        w = 24                              # window size
+        ohlc_columns = self.cfg.cols
+        df = self.normalize(df, cols = ohlc_columns)             # normalize by max value
+        w = self.cfg.window                              # window size
         data = []
         gasf = GramianAngularField(image_size=w, method='difference', sample_range=(0, 1))
         for i in range(len(df)-w-1, -1, -1):
             gasf_images = [gasf.transform([df[c][i:i+w]]) for c in ohlc_columns]
+            patches = np.vstack([df[c][i:i+w] for c in ohlc_columns])                   # stack raw_data
+            gasf_3d = np.vstack(gasf_images)
+            
             typical_prices = (df['High'][i:i+w] + df['Low'][i:i+w] + df['Close'][i:i+w]) / 3
             label = self.make_label(typical_prices=typical_prices, next_close_price=df['Close'][i+w])
             combined_gasf_image = np.sum(gasf_images, axis=0)/len(gasf_images)
-            # combined_gasf_image = np.vstack(gasf_images)
             norm_close = df['norm_close'][i+w-1]
             original_close = df['original_close'][i+w-1]
-            data.append((i, combined_gasf_image, label, norm_close, original_close))
+            
+            data.append((i, combined_gasf_image, gasf_3d, patches, label, norm_close, original_close))
 
         # save
-        with open(f'{self.data_dir}/{kind}_{ticker}.pkl', 'wb') as f:
+        with open(f'{self.data_dir}/{kind}_{ticker}_{self.extension}.pkl', 'wb') as f:
             pickle.dump(data, f)
 
     def make_label(self, typical_prices, next_close_price, n=1.5):
@@ -90,13 +95,13 @@ class PrepareDataset:
 
     def load(self):
         self.train, self.valid, self.test = {}, {}, {}
-        if os.path.exists(f'{self.data_dir}/train_{self.tickers[0]}.pkl'):
+        if os.path.exists(f'{self.data_dir}/train_{self.tickers[0]}_{self.extension}.pkl'):
             for ticker in self.tickers:
-                with open(f'{self.data_dir}/train_{ticker}.pkl', 'rb') as f:
+                with open(f'{self.data_dir}/train_{ticker}_{self.extension}.pkl', 'rb') as f:
                     self.train[ticker] = pickle.load(f)
-                with open(f'{self.data_dir}/valid_{ticker}.pkl', 'rb') as f:
+                with open(f'{self.data_dir}/valid_{ticker}_{self.extension}.pkl', 'rb') as f:
                     self.valid[ticker] = pickle.load(f)
-                with open(f'{self.data_dir}/test_{ticker}.pkl', 'rb') as f:
+                with open(f'{self.data_dir}/test_{ticker}_{self.extension}.pkl', 'rb') as f:
                     self.test[ticker] = pickle.load(f)
         else:
             # load data from Yahoo! Finance
@@ -115,6 +120,7 @@ class PrepareDataset:
 class MyDataset(Dataset):
     def __init__(self, config, data):
         self.cfg = config
+        self.is_2dcnn = self.cfg.train_2dcnn
         self.data = data
         self.load_data()
 
@@ -122,9 +128,14 @@ class MyDataset(Dataset):
         self.images = []
         self.labels = []
         for _, ticker_data in self.data.items():
-            for (idx, gasf_image, label, _, _) in ticker_data:
-                self.images.append(gasf_image)
+            for (idx, gasf_image, gasf_3d, patch, label, _, _) in ticker_data:
+                sample = (gasf_image if self.cfg.model_arch == '2d' else gasf_3d) if self.cfg.train_gasf_image else patch
+                if self.cfg.centered_zero:
+                    sample = (sample - 0.5) * 2
+                self.images.append(sample if self.is_2dcnn else sample.flatten())   # in 1dcnn convert the image to array of raw pixels
                 self.labels.append(label)
+        
+        # Training with sample of data (use it while running on CPU)
         if self.cfg.sample_run:
             self.images = self.images[:50]
             self.labels = self.labels[:50]
@@ -138,8 +149,6 @@ class MyDataset(Dataset):
         return image, label
 
 # DATALOADERS
-
-
 def dataloaders(cfg):
 
     prep = PrepareDataset(config=cfg)

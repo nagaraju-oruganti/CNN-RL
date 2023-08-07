@@ -16,7 +16,7 @@ from datetime import datetime
 from sklearn.metrics import f1_score
 
 ## Local imports
-from helper_models import BollingerClassifier
+from helper_models import BollingerClassifier, Baseline1DCNN
 from helper_dataset import dataloaders
 
 import warnings
@@ -110,6 +110,7 @@ def trainer(config, model, train_loader, valid_loader, optimizer, scheduler):
     
     results = []
     device = config.device
+    precision = torch.bfloat16 if str(device) == 'cpu' else torch.float16
     NUM_EPOCHS = config.num_epochs
     iters_to_accumlate = config.iters_to_accumlate
     
@@ -124,7 +125,7 @@ def trainer(config, model, train_loader, valid_loader, optimizer, scheduler):
         for i, (images, targets) in que:
             
             ###### TRAINING SECQUENCE            
-            with autocast(device_type = str(device), dtype = torch.float16):
+            with autocast(device_type = str(device), dtype = precision):
                 _, _, loss = model(images.to(device), targets.to(device))            # Forward pass
                 loss = loss / iters_to_accumlate
             
@@ -160,7 +161,10 @@ def train(config):
     os.makedirs(config.dest_path, exist_ok=True)
     
     # define model
-    model = BollingerClassifier(num_classes=3)
+    if config.model_arch in ['3d', '2d']:
+        model = BollingerClassifier(config = config, num_classes=3)
+    else:
+        model = Baseline1DCNN(config = config, num_classes=3)
     model.to(device)
     
     # optmizer and scheduler
@@ -183,15 +187,19 @@ if __name__ == '__main__':
     
     config = Config()
     config.data_dir = 'data'      
-    config.models_dir = 'models/cnn_predictor' 
-    config.model_name = 'baseline'
+    config.models_dir = 'models' 
+    config.model_name = '3dcnn_gasf_ohlcv'
     config.train_batch_size = 16
     config.iters_to_accumlate = 1
     config.sample_run = False
     config.learning_rate = 1e-4
-    config.num_epochs = 100
+    config.num_epochs = 200
     config.save_epoch_wait = 1    
-    config.early_stop_count = 10
+    config.early_stop_count = 20
     config.save_checkpoint = True
+    config.model_arch = '3d'
+    config.centered_zero = True
+    config.train_gasf_image = True
+    config.cols = ['Open', 'High', 'Low', 'Close', 'Volume']
     
     results = train(config)

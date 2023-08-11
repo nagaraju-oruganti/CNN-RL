@@ -48,3 +48,4 @@ class Config:
     # Model params
     train_2dcnn = True
     train_gasf_image = True
+    label_on_price_change = False

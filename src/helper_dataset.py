@@ -20,6 +20,8 @@ class PrepareDataset:
         self.data_dir = self.cfg.data_dir
         self.tickers = self.cfg.tickers
         self.extension = ''.join([i[0].lower() for i in self.cfg.cols])
+        if self.cfg.label_on_price_change:
+            self.extension = 'pc_' + self.extension
         print('Preparing data to train the DQN model...')
 
     def fetch_from_yahoo_finance(self, ticker, start, end):
@@ -69,12 +71,16 @@ class PrepareDataset:
             gasf_3d = np.vstack(gasf_images)
             
             typical_prices = (df['High'][i:i+w] + df['Low'][i:i+w] + df['Close'][i:i+w]) / 3
-            label = self.make_label(typical_prices=typical_prices, next_close_price=df['Close'][i+w])
+            if self.cfg.label_on_price_change:
+                label = self.make_label_price_change(close_price=df['Close'][i+w-1],
+                                                     next_close_price = df['Close'][i+w])
+            else:
+                label = self.make_label(typical_prices=typical_prices, next_close_price=df['Close'][i+w])
             combined_gasf_image = np.sum(gasf_images, axis=0)/len(gasf_images)
             norm_close = df['norm_close'][i+w-1]
             original_close = df['original_close'][i+w-1]
             
-            data.append((i, combined_gasf_image, gasf_3d, patches, label, norm_close, original_close))
+            data.append((i, combined_gasf_image, gasf_3d, patches, label, norm_close, original_close))  # single element in a list
 
         # save
         with open(f'{self.data_dir}/{kind}_{ticker}_{self.extension}.pkl', 'wb') as f:
@@ -93,8 +99,18 @@ class PrepareDataset:
             label = 2
         return label
 
+    def make_label_price_change(self, close_price, next_close_price):
+        pct_change = (next_close_price - close_price) / close_price
+        if pct_change >= 5/100:
+            label = 1
+        elif pct_change <= -5/100:
+            label = 2
+        else:
+            label = 0
+        return label
+
     def load(self):
-        self.train, self.valid, self.test = {}, {}, {}
+        self.train, self.valid, self.test = {}, {}, {}          #key (ticker), values (list of images, labels,...)
         if os.path.exists(f'{self.data_dir}/train_{self.tickers[0]}_{self.extension}.pkl'):
             for ticker in self.tickers:
                 with open(f'{self.data_dir}/train_{ticker}_{self.extension}.pkl', 'rb') as f:
@@ -139,6 +155,9 @@ class MyDataset(Dataset):
         if self.cfg.sample_run:
             self.images = self.images[:50]
             self.labels = self.labels[:50]
+            
+        # from collections import Counter
+        # print(Counter(self.labels))
 
     def __len__(self):
         return len(self.images)

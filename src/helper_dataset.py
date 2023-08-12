@@ -64,11 +64,11 @@ class PrepareDataset:
         df = self.normalize(df, cols = ohlc_columns)             # normalize by max value
         w = self.cfg.window                              # window size
         data = []
-        gasf = GramianAngularField(image_size=w, method='difference', sample_range=(0, 1))
+        gadf = GramianAngularField(image_size=w, method='difference', sample_range=(0, 1))
         for i in range(len(df)-w-1, -1, -1):
-            gasf_images = [gasf.transform([df[c][i:i+w]]) for c in ohlc_columns]
+            gadf_images = [gadf.transform([df[c][i:i+w]]) for c in ohlc_columns]
             patches = np.vstack([df[c][i:i+w] for c in ohlc_columns])                   # stack raw_data
-            gasf_3d = np.vstack(gasf_images)
+            gadf_3d = np.vstack(gadf_images)
             
             typical_prices = (df['High'][i:i+w] + df['Low'][i:i+w] + df['Close'][i:i+w]) / 3
             if self.cfg.label_on_price_change:
@@ -76,11 +76,11 @@ class PrepareDataset:
                                                      next_close_price = df['Close'][i+w])
             else:
                 label = self.make_label(typical_prices=typical_prices, next_close_price=df['Close'][i+w])
-            combined_gasf_image = np.sum(gasf_images, axis=0)/len(gasf_images)
+            combined_gadf_image = np.sum(gadf_images, axis=0)/len(gadf_images)
             norm_close = df['norm_close'][i+w-1]
             original_close = df['original_close'][i+w-1]
             
-            data.append((i, combined_gasf_image, gasf_3d, patches, label, norm_close, original_close))  # single element in a list
+            data.append((i, combined_gadf_image, gadf_3d, patches, label, norm_close, original_close))  # single element in a list
 
         # save
         with open(f'{self.data_dir}/{kind}_{ticker}_{self.extension}.pkl', 'wb') as f:
@@ -144,8 +144,8 @@ class MyDataset(Dataset):
         self.images = []
         self.labels = []
         for _, ticker_data in self.data.items():
-            for (idx, gasf_image, gasf_3d, patch, label, _, _) in ticker_data:
-                sample = (gasf_image if self.cfg.model_arch == '2d' else gasf_3d) if self.cfg.train_gasf_image else patch
+            for (idx, gadf_image, gadf_3d, patch, label, _, _) in ticker_data:
+                sample = (gadf_image if self.cfg.model_arch == '2d' else gadf_3d) if self.cfg.train_gadf_image else patch
                 if self.cfg.centered_zero:
                     sample = (sample - 0.5) * 2
                 self.images.append(sample if self.is_2dcnn else sample.flatten())   # in 1dcnn convert the image to array of raw pixels

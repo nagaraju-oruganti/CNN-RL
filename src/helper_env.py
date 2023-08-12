@@ -10,11 +10,11 @@ class PortfolioEnvironment:
         self.images = images
         self.labels = labels
         self.num_assets = len(self.config.tickers)
-        self.total_steps = price_data.shape[0]            # unitl the end of time period
+        self.total_steps = price_data.shape[0]              # unitl the end of time period
         self.target_assets = len(self.config.tickers)
-        self.initial_balance = 1e6          # million
-        self.riskfree_rate = 0.02           # riskfree rate: 2%
-        self.trading_cost = 0.25/100.        # Trading cost : 0.25%
+        self.initial_balance = 1e6                          # million
+        self.riskfree_rate = 0.02                           # riskfree rate: 2%
+        self.trading_cost = 0.25/100.                       # Trading cost : 0.25%
         self.window_size = window_size
         self.return_history = []
         

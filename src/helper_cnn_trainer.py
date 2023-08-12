@@ -172,15 +172,27 @@ def train(config):
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'max', factor=0.5, patience=4)
     
     # dataloaders
-    train_loader, valid_loader, _ = dataloaders(config)
+    train_loader, valid_loader, test_loader = dataloaders(config)
     
     # Trainer
     results = trainer(config, model, train_loader, valid_loader, optimizer, scheduler)
     
+    # Evaluate on Test dataset
+    model.to('cpu')
+    model.load_state_dict(torch.load(os.path.join(config.dest_path, 'model.pth'), map_location=torch.device('cpu'))['model_state_dict'])
+    model.to(device)
+    train_f1, train_loss = evaluate(model, train_loader, device) 
+    valid_f1, valid_loss = evaluate(model, valid_loader, device) 
+    test_f1, test_loss = evaluate(model, test_loader, device) 
+    
+    print('-- Summary')
+    print(f'Train: Loss: {train_loss:.6f}    F1-score: {train_f1:.6f}')
+    print(f'Valid: Loss: {valid_loss:.6f}    F1-score: {valid_f1:.6f}')
+    print(f'Test: Loss : {test_loss:.6f}    F1-score: {test_f1:.6f}')
+    
     ### SAVE RESULTS
     with open(os.path.join(config.dest_path, 'results.pkl'), 'wb') as f:
         pickle.dump(results, f)
-
 
 if __name__ == '__main__':
     from helper_config import Config
@@ -188,7 +200,7 @@ if __name__ == '__main__':
     config = Config()
     config.data_dir = 'data'      
     config.models_dir = 'models' 
-    config.model_name = '3dcnn_gasf_ohlcv'
+    config.model_name = '3dcnn_gadf_ohlcv'
     config.train_batch_size = 16
     config.iters_to_accumlate = 1
     config.sample_run = False
@@ -199,7 +211,7 @@ if __name__ == '__main__':
     config.save_checkpoint = True
     config.model_arch = '3d'
     config.centered_zero = True
-    config.train_gasf_image = True
+    config.train_gadf_image = True
     config.cols = ['Open', 'High', 'Low', 'Close', 'Volume']
     
     results = train(config)

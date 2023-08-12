@@ -1,4 +1,7 @@
 from helper_config import Config
+from helper_env import PortfolioEnvironment
+from helper_agent import DQLAgent
+
 import datetime
 import pandas as pd
 cfg = Config()

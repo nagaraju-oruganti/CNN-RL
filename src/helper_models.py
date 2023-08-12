@@ -6,7 +6,7 @@ class BollingerClassifier(nn.Module):
     def __init__(self, config, num_classes=3):
         super(BollingerClassifier, self).__init__()
         self.config = config
-        in_channels = len(self.config.cols) if self.config.model_arch == '3d' else (1 if self.config.train_gasf_image else 4)
+        in_channels = len(self.config.cols) if self.config.model_arch == '3d' else (1 if self.config.train_gadf_image else 4)
         
         self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=64, kernel_size=3, stride=1, padding=1)
         self.relu1 = nn.ReLU()
@@ -57,8 +57,8 @@ class Baseline1DCNN(nn.Module):
     def __init__(self, config, num_classes):
         super(Baseline1DCNN, self).__init__()
         self.config = config
-        num_features = (config.window * config.window) if config.train_gasf_image else config.window
-        in_channels = 1 if config.train_gasf_image else len(self.config.cols)
+        num_features = (config.window * config.window) if config.train_gadf_image else config.window
+        in_channels = 1 if config.train_gadf_image else len(self.config.cols)
         
         self.conv1 = nn.Conv1d(in_channels= in_channels, out_channels=16, kernel_size = 3, stride = 1, padding = 1)
         self.maxpool1 = nn.AvgPool1d(kernel_size=2, stride = 2)
@@ -77,7 +77,7 @@ class Baseline1DCNN(nn.Module):
     def forward(self, x, y):
         # input x is of shape [16, 576] where 16 is the batchsize 
         # it must be reshaped to work with 1DCNN -> [16, 1, 576]
-        x = x.unsqueeze(1) if self.config.train_gasf_image else x.reshape(x.size(0), len(self.config.cols), 24)
+        x = x.unsqueeze(1) if self.config.train_gadf_image else x.reshape(x.size(0), len(self.config.cols), 24)
         x = self.maxpool1(self.relu(self.conv1(x)))
         x = self.relu(self.conv2(x))
         

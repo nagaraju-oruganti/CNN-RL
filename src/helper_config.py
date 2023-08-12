@@ -1,6 +1,5 @@
 import torch
 
-
 class Config:
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -47,5 +46,5 @@ class Config:
     
     # Model params
     train_2dcnn = True
-    train_gasf_image = True
+    train_gadf_image = True
     label_on_price_change = False

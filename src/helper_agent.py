@@ -140,15 +140,15 @@ class DQLAgent:
             
             self.results.append((episode + 1, self.epsilon, loss, total_reward, balance, annualized_return, self.explo_count, self.model_count))
             
-            # if (episode + 1) % 50 == 0:
-            #     save_model(self.bollinger_classifier, self.dest_path, name = f'bollinger_cls_{self.name}')
-            #     save_model(self.policy_network, self.dest_path, name = f'dqn_{self.name}')
-            #     save_resutls(self.results, self.dest_path, name = f'results_{self.name}')
+            if (episode + 1) % 50 == 0:
+                save_model(self.bollinger_classifier, self.dest_path, name = f'bollinger_cls_{self.name}')
+                save_model(self.policy_network, self.dest_path, name = f'dqn_{self.name}')
+                save_resutls(self.results, self.dest_path, name = f'results_{self.name}')
                 
-            # ## Save at the end
-            # save_model(self.bollinger_classifier, self.dest_path, name = f'bollinger_cls_{self.name}')
-            # save_model(self.policy_network, self.dest_path, name = f'dqn_{self.name}')
-            # save_resutls(self.results, self.dest_path, name = f'results_{self.name}')
+            ## Save at the end
+            save_model(self.bollinger_classifier, self.dest_path, name = f'bollinger_cls_{self.name}')
+            save_model(self.policy_network, self.dest_path, name = f'dqn_{self.name}')
+            save_resutls(self.results, self.dest_path, name = f'results_{self.name}')
             
         return self.results
     
